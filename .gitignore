@@ -1,0 +1,26 @@
+.DS_Store
+__MACOSX/
+.cache/
+build/
+bin/
+obj/
+__pycache__/
+*.pyc
+*.dll
+*.dylib
+*.so
+*.exe
+*.pkg
+*.zip
+*.app/
+*.assets
+*.resS
+*.kenshape
+*.log
+*.pdb
+Samples/
+Palettes/
+Kenney Shape_Data/
+Data/
+.env
+.env.*
