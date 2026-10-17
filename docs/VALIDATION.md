@@ -1,43 +1,47 @@
-# Validation and limits
+# Testing notes
 
-Validation was performed on 17 October 2026 using an Apple M4 Mac running macOS 27.0.1, Rosetta 2, the supported Linux 2.0.0 application, and Unity 2021.3.45f2. This is a compatibility test record, not a guarantee for every Mac or export setting.
+The current build was tested on an Apple M4 with macOS 27.0.1 and Rosetta 2, using Kenney Shape 2.0.0 for Linux. Both the unpacked Unity module and the official component package worked as build inputs. The resulting apps passed `codesign --verify --deep --strict`.
 
-## Source-only build flow
+## App tests
 
-The builder was run against the original Linux ZIP and the separately obtained official Mac Mono support component. It built the Cocoa adapter, patched the original assembly locally, created the app bundle, and passed strict signature verification. The assembly patcher does not require a decompiled application source tree.
+`scripts/smoke_test.py` makes a separate copy of a built app and adds a test runner to that copy. Run it with a new output directory each time:
 
-Input checks refuse unrecognized application assemblies and modified runtime files. Synthetic archive tests exercise path traversal, absolute paths, symbolic links, case-colliding members, and preservation of the selected ZIP:
+```sh
+python3 scripts/smoke_test.py \
+  --app "$PWD/build/Kenney Shape.app" \
+  --output "$PWD/build/smoke-test"
+```
+
+The test loaded all 159 sample projects, checked the resource folder and file-dialog adapter, edited a tile, and saved and reloaded a project. It also generated a model from the potion sample and exported OBJ, STL, and SVG files. The script checks the exported geometry, SVG paths, and compressed project file.
+
+The test runs with `-batchmode -nographics`, so shader warnings in its log are expected. A separate interactive run displayed the original interface and 3D preview through an OpenGL 4.1 context.
+
+## File dialogs
+
+To test the Cocoa adapter on its own:
+
+```sh
+sh native/filebrowser/build.sh
+sh native/filebrowser/test.sh
+```
+
+This opens six dialogs and cancels them automatically. It checks file, folder, and save modes; extension filters; UTF-8 text; multiple-selection settings; cancellation; and async callbacks. There are also tests for parsing filters and formatting returned paths.
+
+## Build inputs
+
+These tests use small synthetic ZIPs and don't need an application download:
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-## Integration test
+They check extraction, preservation of the input ZIP, and rejection of paths or links that could escape the extraction folder. The assembly patcher was also checked against unknown inputs, an already patched assembly, and attempts to overwrite existing files.
 
-The included `scripts/smoke_test.py` creates a disposable app copy and adds a separate test assembly compiled against the user's local application libraries. It does not alter the selected built app or include the test runner in production builds.
+## Still to test
 
-The test passed these checks in the actual macOS player:
+- Older macOS releases and physical Intel Macs.
+- Successful file selection through the full app UI; the automated dialog tests cover cancellation.
+- The full set of Command-key shortcuts.
+- Image import, GIF, FBX, DAE, glTF, VOX, Minecraft output, and the remaining export options.
 
-- The resource-directory helper runs after Unity's startup directory change.
-- The original managed file-browser wrapper loads the Cocoa adapter.
-- All 159 supplied sample projects load with consistent tile counts.
-- A tile can be edited, restored, saved, and reloaded.
-- The potion sample generates 64 mesh instances with 1680 source vertices.
-- OBJ, binary STL, and SVG exports are written successfully.
-- Independent parsing validates an OBJ with 318 vertices and 920 faces, an STL with 920 triangles and a matching byte length, a nonempty SVG, and a valid compressed project saved as version 2.0.0.
-
-The integration player uses `-batchmode -nographics`. Shader warnings in that test are expected. They do not establish interactive rendering quality. A separate interactive launch created an OpenGL 4.1 context on the Apple M4 and displayed the original interface and 3D preview.
-
-## Native adapter tests
-
-The Cocoa adapter passed 14 direct parsing/result checks and 59 assertions across six self-cancelling real dialogs. The checks cover file/folder/save modes, multiple selection, named extension groups, wildcard handling, UTF-8 titles/default filenames, cancellation, and asynchronous callbacks. Architecture slices, exported ABI symbols, and local signing were also verified.
-
-## Remaining coverage
-
-- Successful manual file selection through the complete application UI is not automated by these tests.
-- Command modifier handling is patched in bytecode; every shortcut combination has not been exercised interactively.
-- GIF, FBX, DAE, glTF, VOX, Minecraft output, image import, and every export option are outside the integration suite.
-- The Intel deployment target is macOS 10.13, but older macOS releases and physical Intel hardware were not tested.
-- Native ARM/Metal rendering is unsupported by this builder.
-
-Local logs and exported test files stay in the chosen test directory. They are excluded from the public source package.
+Logs and exported files are saved in the test output directory.
